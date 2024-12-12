@@ -1,36 +1,78 @@
 import json
+import datetime
 import boto3
-import requests
+from botocore.exceptions import ClientError
 
+
+#This Lambda grabs Zip file from S3 bucket and deploy as lambda
+
+lambdaclient = boto3.client('lambda')
+runtime='python3.7'
+role='arn:aws:iam::687604473148:role/service-role/rds-scale-down-role-3xdjzwcu'
+handler='lambda_function.lambda_handler'
+timeout=30
+memorysize=256
 
 def lambda_handler(event, context):
     # TODO implement
-    # api-endpoint 
-    # more dummy comments to test end to end
-    # testing update in CI/CD
-    # Added new content - November 8, 2024
     print(event)
-    URL = "http://maps.googleapis.com/maps/api/geocode/json"
-    location = event['landmark']
-    # defining a params dict for the parameters to be sent to the API
-    PARAMS = {'address':location}
- 
-    # sending get request and saving the response as response object
-    r = requests.get(url = URL, params = PARAMS)
- 
-    # extracting data in json format
-    data = r.json()
- 
- 
-    # extracting latitude, longitude and formatted address 
-    # of the first matching location
-    latitude = data['results'][0]['geometry']['location']['lat']
-    longitude = data['results'][0]['geometry']['location']['lng']
-    formatted_address = data['results'][0]['formatted_address']
- 
-    # printing the output of the landmark --xxx added for stack3
-    print("Latitude:%s\nLongitude:%s\nFormatted Address:%s"
-      %(latitude, longitude,formatted_address))
-    output={"address":formatted_address} 
-    return output
-    #return('Hello from %s'%formatted_address)
+
+    for item in event['Records']:
+        s3bucket=item['s3']['bucket']['name']
+        objectkey=item['s3']['object']['key']
+        print(s3bucket)
+        print(objectkey)
+    
+    functionName=objectkey.rpartition('.')[0]
+    print(functionName)
+    #deployFlag, set C for create, U for Update existing, X for Error
+    deployFlag=""
+    #check if function exists, if yes update, else create
+    try:
+        response=lambdaclient.get_function(FunctionName=functionName)
+        if response['ResponseMetadata']['HTTPStatusCode']==200:
+            print("Function Exists")
+            deployFlag="U"
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            print("Function does not exist")
+            deployFlag="C"
+        else:
+            print("Unexpected error: %s" % e)
+            deployFlag="X"
+        
+    if deployFlag=="C":
+        createLambda(functionName, s3bucket, objectkey)
+    elif deployFlag=="U":
+        updateLambda(functionName, s3bucket, objectkey)
+    else:
+        print("Error, check pipeline")
+    
+    return 'End of Lambda Deployer'    
+
+    
+def createLambda(functionName, s3bucket, objectkey):
+    response=lambdaclient.create_function(
+            FunctionName=functionName,
+            Runtime=runtime,
+            Role=role,
+            Handler=handler,
+            Code={
+            'S3Bucket': s3bucket,
+            'S3Key': objectkey
+                }
+            ,Timeout=timeout
+            ,MemorySize=memorysize
+                )
+    print("in create lambda para***********")
+    print(response)
+
+def updateLambda(functionName, s3bucket, objectkey):
+    response=lambdaclient.update_function_code(
+            FunctionName=functionName,
+            S3Bucket=s3bucket,
+            S3Key=objectkey
+                )
+    print("in update lambda para***********")
+    print(response) 
+

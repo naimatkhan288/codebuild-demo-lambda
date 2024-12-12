@@ -1,20 +1,21 @@
-version: 0.2
+ersion: 0.2 
+
 phases:
   install:
-    runtime-versions:
-      python: 3.7
+    #runtime-versions:
+      #nodejs: 20
+    commands:
+      - echo "Installing dependencies..."
+      - npm install
+      - npm audit fix
+      - ls -la
+  pre_build:
+    commands:
+      - echo "Installed all dependencies..."
   build:
     commands:
-      - echo Build started on `date`
-      - echo Compiling the Python code...
-      - pip install requests -t .
-
+      - echo "Building the Lambda function..."
+      - zip -r function.zip ./*
   post_build:
     commands:
-      - echo Build completed on `date`
-      - pwd
-      - ls -al
-      - pwd
-artifacts:
-  files:
-    - '**/*'
+      - aws lambda update-function-code --function-name nodejs-app --zip-file fileb://function.zip
