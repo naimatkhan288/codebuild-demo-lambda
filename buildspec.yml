@@ -1,9 +1,7 @@
-ersion: 0.2 
+version: 0.2
 
 phases:
   install:
-    #runtime-versions:
-      #nodejs: 20
     commands:
       - echo "Installing dependencies..."
       - npm install
@@ -11,11 +9,15 @@ phases:
       - ls -la
   pre_build:
     commands:
-      - echo "Installed all dependencies..."
+      - echo "All dependencies installed successfully..."
   build:
     commands:
       - echo "Building the Lambda function..."
       - zip -r function.zip ./*
   post_build:
     commands:
+      - echo "Updating the Lambda function code..."
       - aws lambda update-function-code --function-name nodejs-app --zip-file fileb://function.zip
+artifacts:
+  files:
+    - function.zip
